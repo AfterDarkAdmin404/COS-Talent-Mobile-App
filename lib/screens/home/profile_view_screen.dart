@@ -165,7 +165,7 @@ class ProfileViewScreen extends StatelessWidget {
                                       Text('${job.jobTitle} · ${job.companyName}',
                                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                                       Text(
-                                        '${job.started} – ${job.isCurrent ? 'Present' : job.ended}',
+                                        '${formatMonthYear(job.startedOn)} – ${job.isCurrent ? 'Present' : formatMonthYear(job.endedOn!)}',
                                         style: const TextStyle(color: AppColors.muted, fontSize: 11.5),
                                       ),
                                     ],

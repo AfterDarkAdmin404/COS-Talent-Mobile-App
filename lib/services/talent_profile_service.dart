@@ -45,6 +45,7 @@ class TalentProfileService {
     await _syncLinks(next.id!, next.links);
     await _syncEducation(next.id!, next.education);
     await _syncCertifications(next.id!, next.certifications);
+    await _syncWorkHistory(next.id!, next.workHistory);
     return next;
   }
 
@@ -64,6 +65,7 @@ class TalentProfileService {
     await _syncLinks(next.id!, next.links);
     await _syncEducation(next.id!, next.education);
     await _syncCertifications(next.id!, next.certifications);
+    await _syncWorkHistory(next.id!, next.workHistory);
     return next;
   }
 
@@ -184,6 +186,40 @@ class TalentProfileService {
         .toList();
   }
 
+  /// Same replace-the-whole-set approach as [_syncLinks]. Dates go out as
+  /// `YYYY-MM-DD` — `started_on`/`ended_on` are `date` columns, not
+  /// `timestamptz`.
+  static Future<void> _syncWorkHistory(int talentProfileId, List<WorkHistoryEntry> workHistory) async {
+    await _client.from('talent_work_history').delete().eq('talent_profile_id', talentProfileId);
+    if (workHistory.isEmpty) return;
+    await _client.from('talent_work_history').insert(
+      workHistory
+          .map(
+            (w) => {
+              'talent_profile_id': talentProfileId,
+              'job_title': w.jobTitle,
+              'company_name': w.companyName,
+              'started_on': _dateOnly(w.startedOn),
+              'ended_on': w.endedOn == null ? null : _dateOnly(w.endedOn!),
+              'is_current': w.isCurrent,
+              'description': w.description,
+            },
+          )
+          .toList(),
+    );
+  }
+
+  static Future<List<WorkHistoryEntry>> _fetchWorkHistory(int talentProfileId) async {
+    final rows = await _client
+        .from('talent_work_history')
+        .select()
+        .eq('talent_profile_id', talentProfileId)
+        .order('started_on', ascending: false);
+    return (rows as List)
+        .map((r) => WorkHistoryEntry.fromRow(r as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Null when the signed-in account has never completed the onboarding
   /// wizard. Callers should send them into [ProfileSetupFlow] in that
   /// case, and straight to `HomeShell` otherwise.
@@ -203,6 +239,7 @@ class TalentProfileService {
       _fetchLinks(base.id!),
       _fetchEducation(base.id!),
       _fetchCertifications(base.id!),
+      _fetchWorkHistory(base.id!),
     ]);
     return base.copyWith(
       skills: results[0] as List<Skill>,
@@ -210,6 +247,7 @@ class TalentProfileService {
       links: results[2] as List<TalentProfileLink>,
       education: results[3] as List<TalentEducationEntry>,
       certifications: results[4] as List<CertificationEntry>,
+      workHistory: results[5] as List<WorkHistoryEntry>,
     );
   }
 

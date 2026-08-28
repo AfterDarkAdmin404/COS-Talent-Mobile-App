@@ -20,10 +20,15 @@ class StorageService {
     return path;
   }
 
+  /// Object key is `resumes/<path>` inside the bucket, but [path] itself
+  /// (what gets stored in `talent_profiles.resume_storage_path`) stays
+  /// bare — `employer_app`'s `StorageService.resumeSignedUrl()` adds the
+  /// same `resumes/` prefix back on when it signs a download URL, so both
+  /// apps need to agree on this split.
   static Future<String> uploadResume(File file) async {
     final ext = file.path.split('.').last.toLowerCase();
     final path = '${_uuid.v4()}.$ext';
-    await _client.storage.from('talent-documents').upload(path, file);
+    await _client.storage.from('talent-documents').upload('resumes/$path', file);
     return path;
   }
 

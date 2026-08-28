@@ -185,6 +185,20 @@ class ProfileEducationRemoved extends ProfileEvent {
   List<Object?> get props => [index];
 }
 
+class ProfileWorkHistoryAdded extends ProfileEvent {
+  final WorkHistoryEntry entry;
+  const ProfileWorkHistoryAdded(this.entry);
+  @override
+  List<Object?> get props => [entry];
+}
+
+class ProfileWorkHistoryRemoved extends ProfileEvent {
+  final int index;
+  const ProfileWorkHistoryRemoved(this.index);
+  @override
+  List<Object?> get props => [index];
+}
+
 class ProfileVisibilityChanged extends ProfileEvent {
   final bool? showExactRate;
   final bool? showResumePublicly;

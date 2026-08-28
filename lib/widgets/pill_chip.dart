@@ -42,12 +42,15 @@ class PillChip extends StatelessWidget {
               ),
               const SizedBox(width: 6),
             ],
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? AppColors.white : AppColors.ink,
-                fontWeight: FontWeight.w600,
-                fontSize: 13.5,
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? AppColors.white : AppColors.ink,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13.5,
+                ),
               ),
             ),
           ],

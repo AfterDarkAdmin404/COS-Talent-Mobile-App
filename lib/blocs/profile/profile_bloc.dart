@@ -31,6 +31,8 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     on<ProfileLinkRemoved>(_onLinkRemoved);
     on<ProfileEducationAdded>(_onEducationAdded);
     on<ProfileEducationRemoved>(_onEducationRemoved);
+    on<ProfileWorkHistoryAdded>(_onWorkHistoryAdded);
+    on<ProfileWorkHistoryRemoved>(_onWorkHistoryRemoved);
     on<ProfileVisibilityChanged>(_onVisibilityChanged);
     on<ProfileConsentToggled>(_onConsentToggled);
     on<ProfileSubmitRequested>(_onSubmit);
@@ -260,6 +262,19 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     if (p == null) return;
     final list = List.of(p.education)..removeAt(event.index);
     emit(state.copyWith(profile: p.copyWith(education: list)));
+  }
+
+  void _onWorkHistoryAdded(ProfileWorkHistoryAdded event, Emitter<ProfileState> emit) {
+    final p = state.profile;
+    if (p == null) return;
+    emit(state.copyWith(profile: p.copyWith(workHistory: [...p.workHistory, event.entry])));
+  }
+
+  void _onWorkHistoryRemoved(ProfileWorkHistoryRemoved event, Emitter<ProfileState> emit) {
+    final p = state.profile;
+    if (p == null) return;
+    final list = List.of(p.workHistory)..removeAt(event.index);
+    emit(state.copyWith(profile: p.copyWith(workHistory: list)));
   }
 
   void _onVisibilityChanged(ProfileVisibilityChanged event, Emitter<ProfileState> emit) {

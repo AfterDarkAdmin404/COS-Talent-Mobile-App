@@ -238,6 +238,148 @@ class _StepSummaryLinksState extends State<StepSummaryLinks> {
     }
   }
 
+  Future<void> _addWorkHistory() async {
+    final jobTitleController = TextEditingController();
+    final companyController = TextEditingController();
+    final descriptionController = TextEditingController();
+    DateTime? startedOn;
+    DateTime? endedOn;
+    var isCurrent = false;
+    String? jobTitleError;
+    String? startedError;
+    String? dateOrderError;
+
+    final result = await showDialog<WorkHistoryEntry>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Add work history'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: jobTitleController,
+                  autofocus: true,
+                  decoration: InputDecoration(labelText: 'Job title', errorText: jobTitleError),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: companyController,
+                  decoration: const InputDecoration(labelText: 'Company name'),
+                ),
+                const SizedBox(height: 4),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    startedOn == null ? 'Started (required)' : formatMonthYear(startedOn!),
+                    style: TextStyle(
+                      color: startedOn == null ? AppColors.muted : AppColors.ink,
+                      fontSize: 13,
+                    ),
+                  ),
+                  subtitle: startedError != null
+                      ? Text(startedError!, style: const TextStyle(color: AppColors.statusRejected, fontSize: 11.5))
+                      : null,
+                  trailing: const Icon(Icons.calendar_today_outlined, size: 18),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: startedOn ?? DateTime.now(),
+                      firstDate: DateTime(1950),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) setDialogState(() => startedOn = picked);
+                  },
+                ),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: isCurrent,
+                  activeThumbColor: AppColors.teal,
+                  title: const Text('I currently work here', style: TextStyle(fontSize: 13)),
+                  onChanged: (v) => setDialogState(() {
+                    isCurrent = v;
+                    if (v) endedOn = null;
+                  }),
+                ),
+                if (!isCurrent) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      endedOn == null ? 'Ended (optional)' : formatMonthYear(endedOn!),
+                      style: TextStyle(
+                        color: endedOn == null ? AppColors.muted : AppColors.ink,
+                        fontSize: 13,
+                      ),
+                    ),
+                    subtitle: dateOrderError != null
+                        ? Text(dateOrderError!, style: const TextStyle(color: AppColors.statusRejected, fontSize: 11.5))
+                        : null,
+                    trailing: const Icon(Icons.calendar_today_outlined, size: 18),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: endedOn ?? startedOn ?? DateTime.now(),
+                        firstDate: DateTime(1950),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) setDialogState(() => endedOn = picked);
+                    },
+                  ),
+                ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descriptionController,
+                  maxLines: 4,
+                  maxLength: 2000,
+                  decoration: const InputDecoration(labelText: 'Description (optional)'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final jobTitle = jobTitleController.text.trim();
+                if (jobTitle.isEmpty) {
+                  setDialogState(() => jobTitleError = 'Required');
+                  return;
+                }
+                if (startedOn == null) {
+                  setDialogState(() => startedError = 'Required');
+                  return;
+                }
+                if (!isCurrent && endedOn != null && endedOn!.isBefore(startedOn!)) {
+                  setDialogState(() => dateOrderError = 'Must be on or after the start date');
+                  return;
+                }
+                final description = descriptionController.text.trim();
+                Navigator.of(dialogContext).pop(
+                  WorkHistoryEntry(
+                    jobTitle: jobTitle,
+                    companyName: companyController.text.trim(),
+                    startedOn: startedOn!,
+                    endedOn: isCurrent ? null : endedOn,
+                    isCurrent: isCurrent,
+                    description: description.isEmpty ? null : description,
+                  ),
+                );
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      context.read<ProfileBloc>().add(ProfileWorkHistoryAdded(result));
+    }
+  }
+
   IconData _iconForLinkKind(LinkKind kind) => switch (kind) {
     LinkKind.portfolio => Icons.brush_outlined,
     LinkKind.linkedin => Icons.business_center_outlined,
@@ -508,6 +650,50 @@ class _StepSummaryLinksState extends State<StepSummaryLinks> {
               onPressed: _addEducation,
               icon: const Icon(Icons.add, size: 18),
               label: const Text('Add education'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            ),
+            const SizedBox(height: 22),
+            _sectionLabel('Work history', 'Optional'),
+            ...List.generate(p.workHistory.length, (i) {
+              final w = p.workHistory[i];
+              final range =
+                  '${formatMonthYear(w.startedOn)} – ${w.isCurrent ? 'Present' : formatMonthYear(w.endedOn!)}';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: BrandCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.work_outline, color: AppColors.tealDark, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${w.jobTitle} · ${w.companyName}',
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            Text(range, style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => bloc.add(ProfileWorkHistoryRemoved(i)),
+                        icon: const Icon(Icons.close, size: 18, color: AppColors.muted),
+                        visualDensity: VisualDensity.compact,
+                        tooltip: 'Remove',
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            OutlinedButton.icon(
+              onPressed: _addWorkHistory,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add work history'),
               style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
             ),
           ],

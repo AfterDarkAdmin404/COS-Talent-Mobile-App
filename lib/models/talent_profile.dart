@@ -91,20 +91,66 @@ const int kColombiaCountryId = 1;
 /// of hardcoded.
 const int kColombiaUtcOffsetHours = -5;
 
+/// Row shape for `talent_work_history`. Two DB checks to mirror
+/// client-side before either ever reaches a request:
+/// `talent_work_history_current_check` (`isCurrent` and `endedOn` are
+/// mutually exclusive) and `talent_work_history_dates_check`
+/// (`endedOn >= startedOn` when present).
 class WorkHistoryEntry {
+  final int? id;
   final String jobTitle;
   final String companyName;
-  final String started;
-  final String? ended;
+  final DateTime startedOn;
+  final DateTime? endedOn;
   final bool isCurrent;
+  final String? description;
 
   const WorkHistoryEntry({
+    this.id,
     required this.jobTitle,
     required this.companyName,
-    required this.started,
-    this.ended,
+    required this.startedOn,
+    this.endedOn,
     this.isCurrent = false,
+    this.description,
   });
+
+  factory WorkHistoryEntry.fromRow(Map<String, dynamic> row) => WorkHistoryEntry(
+    id: row['id'] as int,
+    jobTitle: row['job_title'] as String,
+    companyName: row['company_name'] as String,
+    startedOn: DateTime.parse(row['started_on'] as String),
+    endedOn: row['ended_on'] == null ? null : DateTime.parse(row['ended_on'] as String),
+    isCurrent: row['is_current'] as bool? ?? false,
+    description: row['description'] as String?,
+  );
+
+  WorkHistoryEntry copyWith({
+    int? id,
+    String? jobTitle,
+    String? companyName,
+    DateTime? startedOn,
+    DateTime? endedOn,
+    bool? isCurrent,
+    String? description,
+  }) => WorkHistoryEntry(
+    id: id ?? this.id,
+    jobTitle: jobTitle ?? this.jobTitle,
+    companyName: companyName ?? this.companyName,
+    startedOn: startedOn ?? this.startedOn,
+    endedOn: endedOn ?? this.endedOn,
+    isCurrent: isCurrent ?? this.isCurrent,
+    description: description ?? this.description,
+  );
+}
+
+/// "Jan 2023" — no `intl` dependency for one label.
+String formatMonthYear(DateTime d) {
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return '${months[d.month - 1]} ${d.year}';
 }
 
 /// Row shape for `talent_certifications`. `credentialUrl`, when present,

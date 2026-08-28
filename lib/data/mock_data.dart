@@ -38,18 +38,18 @@ TalentProfile buildDemoProfile() {
       Skill(id: 3, slug: 'calendar-management', name: 'Calendar Management'),
       Skill(id: 4, slug: 'notion', name: 'Notion'),
     ],
-    workHistory: const [
+    workHistory: [
       WorkHistoryEntry(
         jobTitle: 'Virtual Assistant',
         companyName: 'Bright Loop Consulting (remote, US client)',
-        started: '2023',
+        startedOn: DateTime(2023, 1),
         isCurrent: true,
       ),
       WorkHistoryEntry(
         jobTitle: 'Bookkeeping Assistant',
         companyName: 'Contadores Medellín',
-        started: '2021',
-        ended: '2023',
+        startedOn: DateTime(2021, 1),
+        endedOn: DateTime(2023, 1),
       ),
     ],
     certifications: [
