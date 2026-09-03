@@ -10,7 +10,7 @@ class TalentCategoryService {
         .from('talent_categories')
         .select()
         .eq('is_active', true)
-        .order('sort_order');
+        .order('sort_order', ascending: true);
     return (rows as List)
         .map((r) => TalentCategory.fromRow(r as Map<String, dynamic>))
         .toList();

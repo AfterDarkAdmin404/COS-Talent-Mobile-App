@@ -1,9 +1,9 @@
-/// A candidate's chat is always with COS staff, never with an employer
-/// directly — every employer contact is brokered
-/// (threat-model.md:245: Tier 3 data "never reachable by any employer
-/// path"). This is the in-app surface for that brokering, not a
-/// peer-to-peer thread. Real message tables are Phase 3
-/// (data-model.md:608); this runs on local mock state.
+/// A single message bubble's worth of display data — real, DB-backed
+/// conversations now (`message_threads`/`messages`, migration 041), scoped
+/// to one job application. Kept intentionally minimal (no thread/sender
+/// metadata) since [ChatBubble] only ever needs text/fromMe/time to render
+/// one bubble; [MessageThreadSummary] carries the thread-level fields
+/// (company name, job title) a list view needs instead.
 class ChatMessage {
   final String text;
   final bool fromMe;

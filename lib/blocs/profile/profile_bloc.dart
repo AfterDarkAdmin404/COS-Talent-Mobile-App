@@ -297,6 +297,8 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   }
 
   Future<void> _onSubmit(ProfileSubmitRequested event, Emitter<ProfileState> emit) async {
+    // Same guard as _onUpdate, same reason — see the comment there.
+    if (state.status == ProfileBlocStatus.submitting) return;
     final p = state.profile;
     if (p == null) return;
     emit(state.copyWith(status: ProfileBlocStatus.submitting, errorMessage: null));
@@ -311,6 +313,20 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   }
 
   Future<void> _onUpdate(ProfileUpdateRequested event, Emitter<ProfileState> emit) async {
+    // ⚠️ `on<ProfileUpdateRequested>` registers with no `transformer`, so
+    // flutter_bloc's default runs handlers for the same event type
+    // CONCURRENTLY, not queued. profile_setup_flow.dart's Save button
+    // disables once `state.status == submitting`, but that only takes
+    // effect after the next widget rebuild — a fast double-tap can dispatch
+    // a second ProfileUpdateRequested before that rebuild happens. Both
+    // handlers then run TalentProfileService.updateProfile concurrently,
+    // and _syncSkills' delete-then-insert races: whichever INSERT lands
+    // second collides with rows the other one just wrote, surfacing as
+    // `talent_profile_skills_pkey` (or any of the other _sync* tables' PKs)
+    // even though nothing about the RLS/delete logic itself is wrong. This
+    // check closes the window instead of adding a `bloc_concurrency`
+    // dependency for one guard clause.
+    if (state.status == ProfileBlocStatus.submitting) return;
     final p = state.profile;
     if (p == null) return;
     emit(state.copyWith(status: ProfileBlocStatus.submitting, errorMessage: null));

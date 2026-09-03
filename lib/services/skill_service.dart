@@ -10,7 +10,7 @@ class SkillService {
         .from('skills')
         .select()
         .eq('is_active', true)
-        .order('name');
+        .order('name', ascending: true);
     return (rows as List).map((r) => Skill.fromRow(r as Map<String, dynamic>)).toList();
   }
 }

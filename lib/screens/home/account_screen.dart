@@ -6,6 +6,7 @@ import '../../blocs/profile/profile_bloc.dart';
 import '../../blocs/profile/profile_event.dart';
 import '../../blocs/profile/profile_state.dart';
 import '../../services/auth_service.dart';
+import '../../services/talent_profile_pdf_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/brand_card.dart';
 import '../auth/set_new_password_screen.dart';
@@ -14,8 +15,31 @@ import '../onboarding/welcome_screen.dart';
 /// Account settings + the consent ledger — `marketplace_users` fields
 /// plus a read-out of `marketplace_consents` rows the candidate has on
 /// file. Includes the optional-password affordance from PLAN.md A2.
-class AccountScreen extends StatelessWidget {
+class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
+
+  @override
+  State<AccountScreen> createState() => _AccountScreenState();
+}
+
+class _AccountScreenState extends State<AccountScreen> {
+  bool _downloading = false;
+
+  Future<void> _downloadData() async {
+    final profile = context.read<ProfileBloc>().state.profile;
+    if (profile == null || _downloading) return;
+    setState(() => _downloading = true);
+    try {
+      await TalentProfilePdfService.downloadAndShare(profile, email: AuthService.currentUser?.email);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Couldn\'t build that PDF. $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,14 +104,21 @@ class AccountScreen extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             BrandCard(
-              onTap: () {},
+              onTap: _downloading ? null : _downloadData,
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.download_outlined, color: AppColors.navyLight, size: 20),
-                  SizedBox(width: 12),
-                  Expanded(child: Text('Download my data', style: TextStyle(fontWeight: FontWeight.w600))),
-                  Icon(Icons.chevron_right, color: AppColors.muted),
+                  const Icon(Icons.download_outlined, color: AppColors.navyLight, size: 20),
+                  const SizedBox(width: 12),
+                  const Expanded(child: Text('Download my data', style: TextStyle(fontWeight: FontWeight.w600))),
+                  if (_downloading)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    const Icon(Icons.chevron_right, color: AppColors.muted),
                 ],
               ),
             ),
