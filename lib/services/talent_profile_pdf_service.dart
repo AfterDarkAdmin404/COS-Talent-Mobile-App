@@ -92,7 +92,7 @@ class TalentProfilePdfService {
             ?email,
             '${profile.yearsExperience} yr${profile.yearsExperience == 1 ? '' : 's'} experience',
             '${profile.englishLevel.label} English',
-          ].join('  ·  '),
+          ].join('  |  '),
           style: const pw.TextStyle(fontSize: 9.5, color: _muted),
         ),
         pw.SizedBox(height: 10),
@@ -119,13 +119,13 @@ class TalentProfilePdfService {
   );
 
   static pw.Widget _workHistoryItem(WorkHistoryEntry w) {
-    final dates = '${formatMonthYear(w.startedOn)} – ${w.isCurrent ? 'Present' : (w.endedOn != null ? formatMonthYear(w.endedOn!) : '')}';
+    final dates = '${formatMonthYear(w.startedOn)} - ${w.isCurrent ? 'Present' : (w.endedOn != null ? formatMonthYear(w.endedOn!) : '')}';
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 10),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text('${w.jobTitle} — ${w.companyName}', style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold)),
+          pw.Text('${w.jobTitle} - ${w.companyName}', style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold)),
           pw.Text(dates, style: const pw.TextStyle(fontSize: 9, color: _muted)),
           if ((w.description ?? '').trim().isNotEmpty) ...[
             pw.SizedBox(height: 2),
@@ -140,18 +140,18 @@ class TalentProfilePdfService {
     final years = [
       if (e.startedYear != null) e.startedYear.toString(),
       if (e.completedYear != null) e.completedYear.toString(),
-    ].join(' – ');
+    ].join(' - ');
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 8),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text(
-            '${e.level.label} — ${e.institution}',
+            '${e.level.label} - ${e.institution}',
             style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold),
           ),
           pw.Text(
-            [if ((e.fieldOfStudy ?? '').trim().isNotEmpty) e.fieldOfStudy!.trim(), if (years.isNotEmpty) years].join('  ·  '),
+            [if ((e.fieldOfStudy ?? '').trim().isNotEmpty) e.fieldOfStudy!.trim(), if (years.isNotEmpty) years].join('  |  '),
             style: const pw.TextStyle(fontSize: 9, color: _muted),
           ),
         ],
@@ -171,7 +171,7 @@ class TalentProfilePdfService {
               if ((c.issuer ?? '').trim().isNotEmpty) c.issuer!.trim(),
               if (c.issuedOn != null) formatMonthYear(c.issuedOn!),
               if ((c.credentialUrl ?? '').trim().isNotEmpty) c.credentialUrl!.trim(),
-            ].join('  ·  '),
+            ].join('  |  '),
             style: const pw.TextStyle(fontSize: 9, color: _muted),
           ),
         ],
