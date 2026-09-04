@@ -20,7 +20,7 @@ class MessageThreadSummary {
   });
 
   /// Expects
-  /// `.select('id, job_application_id, job_applications(job_postings(title, employer_companies(company_name))), messages(body, sender_kind, created_at)')`
+  /// `.select('id, job_application_id, job_applications(job_postings(title, employer_companies(company_name))), messages(id, body, sender_kind, created_at, deleted_at, attachment_kind, attachment_file_name)')`
   /// with the `messages` embed ordered/limited to the single latest row.
   factory MessageThreadSummary.fromRow(Map<String, dynamic> row) {
     final application = row['job_applications'] as Map<String, dynamic>?;
@@ -36,7 +36,14 @@ class MessageThreadSummary {
       lastMessage: lastRow == null
           ? null
           : ChatMessage(
-              text: lastRow['body'] as String,
+              id: lastRow['id'] as int,
+              // 046/048: an attachment-only row has no body, and a deleted
+              // row has neither -- synthesize a short preview for both,
+              // same idea as an SMS client showing "📷 Photo" for an MMS.
+              text: lastRow['deleted_at'] != null
+                  ? 'This message was deleted'
+                  : lastRow['body'] as String? ??
+                        (lastRow['attachment_kind'] == 'image' ? '📷 Photo' : '📎 ${lastRow['attachment_file_name']}'),
               fromMe: lastRow['sender_kind'] == 'candidate',
               time: DateTime.parse(lastRow['created_at'] as String),
             ),

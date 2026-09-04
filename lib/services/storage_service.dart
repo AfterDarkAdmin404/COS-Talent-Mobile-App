@@ -34,4 +34,26 @@ class StorageService {
 
   static String photoPublicUrl(String path) =>
       _client.storage.from('talent-photos').getPublicUrl(path);
+
+  /// Object key is `<threadKind>/<threadId>/<uuid>.<ext>`, not a bare
+  /// UUID like [uploadPhoto]/[uploadResume] — deliberately, unlike those.
+  /// This bucket is private (046), so knowing a path alone gets you
+  /// nothing; storage.objects RLS needs the thread id in the path to
+  /// check the caller actually belongs to that thread.
+  static Future<String> uploadMessageAttachment({
+    required String threadKind,
+    required int threadId,
+    required File file,
+  }) async {
+    final ext = file.path.split('.').last.toLowerCase();
+    final path = '$threadKind/$threadId/${_uuid.v4()}.$ext';
+    await _client.storage.from('message-attachments').upload(path, file);
+    return path;
+  }
+
+  /// Longer-lived than [uploadResume]'s signed URL (046's private bucket
+  /// too, same idea) -- a resume is opened once and closed, a chat image
+  /// stays on screen while the thread is scrolled.
+  static Future<String> messageAttachmentSignedUrl(String path) =>
+      _client.storage.from('message-attachments').createSignedUrl(path, 3600);
 }

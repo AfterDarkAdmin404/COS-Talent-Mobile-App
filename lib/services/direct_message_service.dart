@@ -1,6 +1,11 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/chat_message.dart';
 import '../models/direct_message_thread_summary.dart';
+import 'storage_service.dart';
 
 /// Reads and writes `public.direct_message_threads` / `public.direct_messages`
 /// (042) — direct employer<->candidate messaging, independent of any job
@@ -77,11 +82,59 @@ class DirectMessageService {
         .map((rows) => rows.map(_messageFromRow).toList());
   }
 
-  static ChatMessage _messageFromRow(Map<String, dynamic> r) => ChatMessage(
-    text: r['body'] as String,
-    fromMe: r['sender_kind'] == 'candidate',
-    time: DateTime.parse(r['created_at'] as String),
-  );
+  static ChatMessage _messageFromRow(Map<String, dynamic> r) {
+    final attachmentPath = r['attachment_storage_path'] as String?;
+    return ChatMessage(
+      id: r['id'] as int,
+      text: r['body'] as String?,
+      attachment: attachmentPath == null
+          ? null
+          : ChatAttachment(
+              storagePath: attachmentPath,
+              kind: r['attachment_kind'] == 'image' ? ChatAttachmentKind.image : ChatAttachmentKind.file,
+              fileName: r['attachment_file_name'] as String,
+              mimeType: r['attachment_mime_type'] as String,
+              sizeBytes: r['attachment_size_bytes'] as int,
+            ),
+      fromMe: r['sender_kind'] == 'candidate',
+      time: DateTime.parse(r['created_at'] as String),
+      editedAt: r['edited_at'] == null ? null : DateTime.parse(r['edited_at'] as String),
+      deletedAt: r['deleted_at'] == null ? null : DateTime.parse(r['deleted_at'] as String),
+    );
+  }
+
+  /// Changes [messageId]'s text -- see `MessageService.editMessage` for
+  /// the RLS/trigger rationale.
+  static Future<void> editMessage({required int messageId, required String body}) async {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty) throw ArgumentError('body must not be empty');
+    await _client.from('direct_messages').update({'body': trimmed}).eq('id', messageId);
+  }
+
+  /// Soft-deletes [message] -- see `MessageService.deleteMessage` for the
+  /// tombstone rationale.
+  static Future<void> deleteMessage(ChatMessage message) async {
+    await _client
+        .from('direct_messages')
+        .update({
+          'body': null,
+          'attachment_storage_path': null,
+          'attachment_kind': null,
+          'attachment_file_name': null,
+          'attachment_mime_type': null,
+          'attachment_size_bytes': null,
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', message.id);
+    final path = message.attachment?.storagePath;
+    if (path != null) {
+      try {
+        await _client.storage.from('message-attachments').remove([path]);
+      } catch (e) {
+        debugPrint('message-attachments remove($path) failed: $e');
+      }
+    }
+  }
 
   /// Every direct thread `direct_message_threads_select_candidate` (042)
   /// lets this account see, that has at least one message. Most-recently-
@@ -92,7 +145,7 @@ class DirectMessageService {
         .select('''
           employer_company_id,
           employer_companies(company_name),
-          direct_messages(body, sender_kind, created_at)
+          direct_messages(id, body, sender_kind, created_at, deleted_at, attachment_kind, attachment_file_name)
         ''')
         .order('created_at', referencedTable: 'direct_messages', ascending: false)
         .limit(1, referencedTable: 'direct_messages');
@@ -126,6 +179,48 @@ class DirectMessageService {
       'sender_marketplace_user_id': userId,
       'body': trimmed,
     });
+    return threadId;
+  }
+
+  /// Same shape as [sendAsCandidate] but for a message that is an
+  /// attachment instead of text (046) — see `MessageService`'s matching
+  /// method for the thread-first-then-upload / best-effort-cleanup
+  /// rationale.
+  static Future<int> sendAttachmentAsCandidate({
+    required int employerCompanyId,
+    required int talentProfileId,
+    required File file,
+    required ChatAttachmentKind kind,
+    required String fileName,
+    required String mimeType,
+    required int sizeBytes,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Not signed in.');
+    final threadId = await _getOrCreateThreadId(
+      employerCompanyId: employerCompanyId,
+      talentProfileId: talentProfileId,
+    );
+    final storagePath = await StorageService.uploadMessageAttachment(
+      threadKind: 'direct',
+      threadId: threadId,
+      file: file,
+    );
+    try {
+      await _client.from('direct_messages').insert({
+        'thread_id': threadId,
+        'sender_kind': 'candidate',
+        'sender_marketplace_user_id': userId,
+        'attachment_storage_path': storagePath,
+        'attachment_kind': kind == ChatAttachmentKind.image ? 'image' : 'file',
+        'attachment_file_name': fileName,
+        'attachment_mime_type': mimeType,
+        'attachment_size_bytes': sizeBytes,
+      });
+    } catch (_) {
+      unawaited(_client.storage.from('message-attachments').remove([storagePath]));
+      rethrow;
+    }
     return threadId;
   }
 }

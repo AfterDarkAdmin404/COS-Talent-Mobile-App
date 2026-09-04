@@ -18,7 +18,7 @@ class DirectMessageThreadSummary {
   });
 
   /// Expects
-  /// `.select('employer_company_id, employer_companies(company_name), direct_messages(body, sender_kind, created_at)')`
+  /// `.select('employer_company_id, employer_companies(company_name), direct_messages(id, body, sender_kind, created_at, deleted_at, attachment_kind, attachment_file_name)')`
   /// with the `direct_messages` embed ordered/limited to the single latest row.
   factory DirectMessageThreadSummary.fromRow(Map<String, dynamic> row) {
     final company = row['employer_companies'] as Map<String, dynamic>?;
@@ -30,7 +30,11 @@ class DirectMessageThreadSummary {
       lastMessage: lastRow == null
           ? null
           : ChatMessage(
-              text: lastRow['body'] as String,
+              id: lastRow['id'] as int,
+              text: lastRow['deleted_at'] != null
+                  ? 'This message was deleted'
+                  : lastRow['body'] as String? ??
+                        (lastRow['attachment_kind'] == 'image' ? '📷 Photo' : '📎 ${lastRow['attachment_file_name']}'),
               fromMe: lastRow['sender_kind'] == 'candidate',
               time: DateTime.parse(lastRow['created_at'] as String),
             ),

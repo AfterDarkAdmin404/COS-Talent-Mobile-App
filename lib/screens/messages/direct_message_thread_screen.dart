@@ -5,6 +5,7 @@ import '../../models/chat_message.dart';
 import '../../services/direct_message_service.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/attachment_picker.dart';
 import '../../widgets/chat_bubble.dart';
 
 /// A direct conversation with one employer, not scoped to any job
@@ -93,6 +94,98 @@ class _DirectMessageThreadScreenState extends State<DirectMessageThreadScreen> {
     }
   }
 
+  Future<void> _pickAndSendAttachment() async {
+    final talentProfileId = _talentProfileId;
+    if (_sending || talentProfileId == null) return;
+    final picked = await pickChatAttachment(context);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    try {
+      final threadId = await DirectMessageService.sendAttachmentAsCandidate(
+        employerCompanyId: widget.employerCompanyId,
+        talentProfileId: talentProfileId,
+        file: picked.file,
+        kind: picked.kind,
+        fileName: picked.fileName,
+        mimeType: picked.mimeType,
+        sizeBytes: picked.sizeBytes,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sending = false;
+        if (_threadId == null) {
+          _threadId = threadId;
+          _messagesStream = DirectMessageService.streamMessages(threadId);
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _sending = false;
+        _error = 'Couldn\'t send that. $e';
+      });
+    }
+  }
+
+  Future<void> _editMessage(ChatMessage message) async {
+    final editController = TextEditingController(text: message.text);
+    final newText = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit message'),
+        content: TextField(
+          controller: editController,
+          autofocus: true,
+          maxLines: 4,
+          textCapitalization: TextCapitalization.sentences,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(editController.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    // Deferred, not immediate -- see application_thread_screen.dart's
+    // matching comment: disposing right after showDialog's Future resolves
+    // can race the dialog's own closing transition and crash.
+    WidgetsBinding.instance.addPostFrameCallback((_) => editController.dispose());
+    final trimmed = newText?.trim();
+    if (trimmed == null || trimmed.isEmpty || trimmed == message.text || !mounted) return;
+    try {
+      await DirectMessageService.editMessage(messageId: message.id, body: trimmed);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Couldn\'t save that edit. $e')));
+    }
+  }
+
+  Future<void> _deleteMessage(ChatMessage message) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this message?'),
+        content: const Text('The other person will see that a message was deleted, not its content.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await DirectMessageService.deleteMessage(message);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Couldn\'t delete that message. $e')));
+    }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -150,7 +243,17 @@ class _DirectMessageThreadScreenState extends State<DirectMessageThreadScreen> {
           reverse: true,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           itemCount: messages.length,
-          itemBuilder: (context, i) => ChatBubble(message: messages[messages.length - 1 - i]),
+          itemBuilder: (context, i) {
+            final message = messages[messages.length - 1 - i];
+            return ChatBubble(
+              key: ValueKey(message.id),
+              message: message,
+              onEdit: message.fromMe && !message.isDeleted && message.attachment == null
+                  ? () => _editMessage(message)
+                  : null,
+              onDelete: message.fromMe && !message.isDeleted ? () => _deleteMessage(message) : null,
+            );
+          },
         );
       },
     );
@@ -178,6 +281,11 @@ class _DirectMessageThreadScreenState extends State<DirectMessageThreadScreen> {
               ),
               child: Row(
                 children: [
+                  IconButton(
+                    tooltip: 'Attach',
+                    onPressed: _sending ? null : _pickAndSendAttachment,
+                    icon: const Icon(Icons.attach_file, color: AppColors.navyLight),
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _controller,

@@ -230,7 +230,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  last.fromMe ? 'You: ${last.text}' : last.text,
+                                  // Always non-null here: MessageThreadSummary/
+                                  // DirectMessageThreadSummary synthesize a
+                                  // preview string (e.g. "📷 Photo") for an
+                                  // attachment-only row, so this is never the
+                                  // model's raw nullable `body`.
+                                  last.fromMe ? 'You: ${last.text!}' : last.text!,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(fontSize: 13, color: AppColors.ink),
